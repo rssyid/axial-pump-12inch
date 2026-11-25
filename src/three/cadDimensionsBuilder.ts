@@ -1,12 +1,16 @@
 import * as THREE from 'three';
-import { CadDimensionId, StageMode } from '../types';
+import { CadDimensionId, Language, StageMode } from '../types';
 import { DIM, pipePointAtS } from './dimensions';
 
 export interface CadDimensionAnchor {
   id: CadDimensionId;
   anchor: THREE.Object3D;
   accent: 'amber' | 'cyan';
-  getLabel: (stageMode: StageMode, canalWaterY: number) => {
+  getLabel: (
+    stageMode: StageMode,
+    canalWaterY: number,
+    lang: Language,
+  ) => {
     label: string;
     sublabel?: string;
   };
@@ -373,47 +377,66 @@ export function buildCadDimensionsOverlay(): CadDimensionsSystem {
       id: 'horiz_1m',
       anchor: horizAnchor,
       accent: 'amber',
-      getLabel: () => ({ label: '100 cm', sublabel: 'Mendatar' }),
+      getLabel: (_stage, _waterY, lang) => ({
+        label: '100 cm',
+        sublabel: lang === 'id' ? 'Mendatar' : 'Horizontal',
+      }),
     },
     {
       id: 'inclined_5m',
       anchor: inclinedAnchor,
       accent: 'amber',
-      getLabel: () => ({ label: '500 cm', sublabel: 'Pipa Miring' }),
+      getLabel: (_stage, _waterY, lang) => ({
+        label: '500 cm',
+        sublabel: lang === 'id' ? 'Pipa Miring' : 'Inclined Pipe',
+      }),
     },
     {
       id: 'slope_18deg',
       anchor: slopeAnchor,
       accent: 'amber',
-      getLabel: () => ({ label: '18,0°', sublabel: 'Kemiringan' }),
+      getLabel: (_stage, _waterY, lang) => ({
+        label: lang === 'id' ? '18,0°' : '18.0°',
+        sublabel: lang === 'id' ? 'Kemiringan' : 'Slope',
+      }),
     },
     {
       id: 'gland_1m',
       anchor: glandAnchor,
       accent: 'cyan',
-      getLabel: () => ({ label: '±100 cm', sublabel: 'Gland → Impeller' }),
+      getLabel: () => ({
+        label: '±100 cm',
+        sublabel: 'Gland → Impeller',
+      }),
     },
     {
       id: 'pipe_dia',
       anchor: diaAnchor,
       accent: 'cyan',
-      getLabel: () => ({ label: 'Ø 300 mm', sublabel: '12" PVC AW' }),
+      getLabel: () => ({
+        label: 'Ø 300 mm',
+        sublabel: '12" PVC AW',
+      }),
     },
     {
       id: 'lift_height',
       anchor: liftAnchor,
       accent: 'cyan',
-      getLabel: (stageMode, canalWaterY) => {
+      getLabel: (stageMode, canalWaterY, lang) => {
         if (stageMode === 'tanggul') {
           const liftM = Math.max(0.45, DIM.DISCHARGE_MOUTH_Y - canalWaterY);
+          const formatted =
+            lang === 'id'
+              ? liftM.toFixed(2).replace('.', ',')
+              : liftM.toFixed(2);
           return {
-            label: `${liftM.toFixed(2).replace('.', ',')} m`,
-            sublabel: 'Static Lift',
+            label: `${formatted} m`,
+            sublabel: lang === 'id' ? 'Head Statis' : 'Static Lift',
           };
         }
         return {
-          label: '1,32 m',
-          sublabel: 'Podium Uji',
+          label: lang === 'id' ? '1,32 m' : '1.32 m',
+          sublabel: lang === 'id' ? 'Podium Uji' : 'Test Podium',
         };
       },
     },

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { UI_COPY } from '../i18n';
 import {
   CameraPresetId,
   ProjectedDimension,
@@ -30,6 +31,7 @@ export function Viewport3D({
   const mountRef = useRef<HTMLDivElement | null>(null);
   const [contextLost, setContextLost] = useState(false);
   const [initError, setInitError] = useState<string | null>(null);
+  const copy = UI_COPY[config.language].viewport;
 
   // Keep latest callbacks in refs so WebGL scene initializes strictly once
   const callbacksRef = useRef({
@@ -65,7 +67,7 @@ export function Viewport3D({
       setInitError(
         err instanceof Error
           ? err.message
-          : 'Unable to initialize WebGL 3D context.',
+          : UI_COPY[initialConfigRef.current.language].viewport.initFallbackMsg,
       );
     }
 
@@ -85,25 +87,24 @@ export function Viewport3D({
       <div
         ref={mountRef}
         className="w-full h-full cursor-grab active:cursor-grabbing"
-        aria-label="Interactive 3D viewport of Dongfeng ZH1130 diesel engine and 12-inch axial flow water pump"
+        aria-label={copy.ariaLabel}
       />
 
       {(contextLost || initError) && (
         <div className="absolute inset-0 z-30 flex items-center justify-center bg-[#0b0e13]/95 p-6">
           <div className="max-w-md border border-white/15 bg-[#121720] p-6 text-center">
             <h2 className="font-[var(--font-display)] text-2xl font-bold tracking-wide text-slate-100">
-              {initError ? 'WebGL Unavailable' : '3D Context Paused'}
+              {initError ? copy.webglUnavailable : copy.contextPaused}
             </h2>
             <p className="mt-2 text-sm text-slate-400 leading-relaxed">
-              {initError ??
-                'The graphics context was temporarily interrupted. Reload or resume to restore the interactive 3D engineering showcase.'}
+              {initError ?? copy.contextLostMsg}
             </p>
             <button
               type="button"
               onClick={() => window.location.reload()}
               className="mt-4 px-4 py-2 text-xs font-semibold text-white bg-[#c81d25] hover:bg-[#dc2626] rounded transition-colors cursor-pointer"
             >
-              Reload Viewport
+              {copy.reloadButton}
             </button>
           </div>
         </div>

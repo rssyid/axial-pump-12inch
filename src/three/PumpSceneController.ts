@@ -256,6 +256,7 @@ export class PumpSceneController {
     const prevStage: StageMode = this.config.stageMode;
     const prevTimeOfDay: TimeOfDay = this.config.timeOfDay;
     const prevCad = this.config.cadDimensionsVisible;
+    const prevLang = this.config.language;
     this.config = { ...next };
 
     if (next.stageMode !== prevStage || next.timeOfDay !== prevTimeOfDay) {
@@ -264,6 +265,8 @@ export class PumpSceneController {
 
     if (prevCad && !next.cadDimensionsVisible) {
       this.callbacks.onDimensionsProjected([]);
+    } else if (next.cadDimensionsVisible && next.language !== prevLang) {
+      this.projectDimensions();
     }
   }
 
@@ -385,7 +388,11 @@ export class PumpSceneController {
 
       const sx = Math.round((this._projVec.x * 0.5 + 0.5) * width);
       const sy = Math.round((-this._projVec.y * 0.5 + 0.5) * height);
-      const text = def.getLabel(this.config.stageMode, this.currentCanalWaterY);
+      const text = def.getLabel(
+        this.config.stageMode,
+        this.currentCanalWaterY,
+        this.config.language,
+      );
 
       if (
         Math.abs(item.x - sx) >= 1 ||

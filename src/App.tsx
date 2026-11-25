@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { DieselAudioEngine } from './audio/DieselAudioEngine';
 import { HudOverlay } from './components/HudOverlay';
 import { Viewport3D } from './components/Viewport3D';
+import { UI_COPY } from './i18n';
 import { PumpSceneController } from './three/PumpSceneController';
 import {
   BomPartItem,
@@ -19,6 +20,7 @@ import {
 } from './types';
 
 const INITIAL_CONFIG: ShowcaseConfig = {
+  language: 'id',
   targetRpm: 1400,
   stageMode: 'tanggul',
   timeOfDay: 'day',
@@ -82,6 +84,12 @@ export default function App() {
   useEffect(() => {
     audioRef.current?.setMuted(config.audioMuted);
   }, [config.audioMuted]);
+
+  // Sync document language and browser tab title with active ID | EN language
+  useEffect(() => {
+    document.documentElement.lang = config.language;
+    document.title = UI_COPY[config.language].pageTitle;
+  }, [config.language]);
 
   // Keep audio frequency/volume tracking live damped RPM & effective water flow
   const handleTelemetry = useCallback(
@@ -175,6 +183,11 @@ export default function App() {
         setConfig((prev) => ({
           ...prev,
           beltGuardVisible: !prev.beltGuardVisible,
+        }));
+      } else if (e.key === 'l' || e.key === 'L') {
+        setConfig((prev) => ({
+          ...prev,
+          language: prev.language === 'id' ? 'en' : 'id',
         }));
       } else if (e.key === 'Escape') {
         setActiveHotspot(null);

@@ -23,6 +23,15 @@ import {
   X,
 } from 'lucide-react';
 import {
+  formatCurrency,
+  formatDecimal,
+  formatDuration,
+  formatInteger,
+  Language,
+  pickText,
+  UI_COPY,
+} from '../i18n';
+import {
   BOM_SECTIONS,
   BomPartItem,
   CAMERA_PRESETS,
@@ -69,18 +78,16 @@ const HOTSPOT_ORDER: HotspotId[] = [
   'propeller',
 ];
 
-const RPM_STOPS = [
-  { label: 'Off', value: 0 },
-  { label: '800', value: 800 },
-  { label: '1400', value: 1400 },
-  { label: '2200', value: 2200 },
-];
+const RPM_VALUES = [0, 800, 1400, 2200] as const;
 
-const CANAL_LEVEL_PRESETS = [
-  { label: 'Surut', value: -0.94 },
-  { label: 'Vortex', value: -0.74 },
-  { label: 'Normal', value: -0.58 },
-  { label: 'Banjir', value: -0.26 },
+const CANAL_LEVEL_PRESETS: Array<{
+  key: 'dry' | 'vortex' | 'normal' | 'flood';
+  value: number;
+}> = [
+  { key: 'dry', value: -0.94 },
+  { key: 'vortex', value: -0.74 },
+  { key: 'normal', value: -0.58 },
+  { key: 'flood', value: -0.26 },
 ];
 
 const PRESET_LIST: CameraPresetId[] = [
@@ -91,24 +98,9 @@ const PRESET_LIST: CameraPresetId[] = [
   'discharge',
 ];
 
-const TIME_OPTIONS: Array<{ id: TimeOfDay; label: string }> = [
-  { id: 'day', label: 'Siang' },
-  { id: 'dusk', label: 'Sore' },
-  { id: 'night', label: 'Malam' },
-];
-
-function formatDuration(hours: number): string {
-  const totalMinutes = Math.max(1, Math.round(hours * 60));
-  const h = Math.floor(totalMinutes / 60);
-  const m = totalMinutes % 60;
-  if (h === 0) return `${m} mnt`;
-  if (m === 0) return `${h} jam`;
-  return `${h} jam ${m} mnt`;
-}
-
-function formatRupiah(amount: number): string {
-  return `Rp ${Math.round(amount).toLocaleString('id-ID')}`;
-}
+const STAGE_LIST: StageMode[] = ['tanggul', 'studio', 'field'];
+const TIME_LIST: TimeOfDay[] = ['day', 'dusk', 'night'];
+const LANG_LIST: Language[] = ['id', 'en'];
 
 export function HudOverlay({
   config,
@@ -130,6 +122,8 @@ export function HudOverlay({
   onCloseDrawer,
   onSelectBomItem,
 }: HudOverlayProps) {
+  const lang = config.language;
+  const copy = UI_COPY[lang];
   const isDaylight =
     config.stageMode !== 'studio' && config.timeOfDay !== 'night';
   const isTanggul = config.stageMode === 'tanggul';
@@ -149,33 +143,62 @@ export function HudOverlay({
   return (
     <div className="pointer-events-none fixed inset-0 z-10 overflow-hidden">
       {/* =================================================================== */}
-      {/* TOP BAR: MINIMAL TITLE LOCKUP (LEFT) + TELEMETRY STRIP (RIGHT)      */}
+      {/* TOP BAR: TITLE LOCKUP + ID|EN SWITCH (LEFT) & TELEMETRY (RIGHT)     */}
       {/* =================================================================== */}
       <header className="flex flex-wrap items-start justify-between gap-4 p-4 sm:p-5">
-        {/* Top-Left Brand / Model Designation (Zero-Pill Clean Typography) */}
+        {/* Top-Left Brand / Model Designation + Compact ID | EN Switcher */}
         <div
-          className={`pointer-events-auto rounded-lg px-4 py-2.5 shadow-lg ${
+          className={`pointer-events-auto flex items-start justify-between gap-3.5 rounded-lg px-4 py-2.5 shadow-lg ${
             isDaylight
               ? 'bg-[#0e131b]/92 border border-black/25 text-slate-100'
               : 'bg-[#0e131b]/85 border border-white/12 text-slate-100'
           }`}
         >
-          <h1
-            className="text-xl sm:text-2xl font-bold tracking-tight leading-none text-white whitespace-nowrap"
-            style={{ fontFamily: 'var(--font-display)' }}
+          <div>
+            <h1
+              className="text-xl sm:text-2xl font-bold tracking-tight leading-none text-white whitespace-nowrap"
+              style={{ fontFamily: 'var(--font-display)' }}
+            >
+              DONGFENG ZH1130
+            </h1>
+            <div className="mt-1 flex items-center gap-1.5 text-[11px] font-medium text-slate-300/90 whitespace-nowrap">
+              <span>{copy.header.pumpType}</span>
+              <span aria-hidden="true" className="text-slate-500">
+                ·
+              </span>
+              <span>{copy.header.pipeSpec}</span>
+              <span aria-hidden="true" className="text-slate-500">
+                ·
+              </span>
+              <span>{copy.header.engineSpec}</span>
+            </div>
+          </div>
+
+          {/* Segmented ID | EN Language Toggle (Zero-Pill Industrial Box) */}
+          <div
+            className="flex items-center rounded border border-white/15 bg-black/45 p-0.5 shrink-0"
+            role="group"
+            aria-label={copy.header.langSwitchAria}
+            title={copy.header.langSwitchTitle}
           >
-            DONGFENG ZH1130
-          </h1>
-          <div className="mt-1 flex items-center gap-1.5 text-[11px] font-medium text-slate-300/90 whitespace-nowrap">
-            <span>12&quot; PVC AW Axial Pump</span>
-            <span aria-hidden="true" className="text-slate-500">
-              ·
-            </span>
-            <span>1m + 5m (18°)</span>
-            <span aria-hidden="true" className="text-slate-500">
-              ·
-            </span>
-            <span>30 HP Diesel</span>
+            {LANG_LIST.map((code) => {
+              const active = lang === code;
+              return (
+                <button
+                  key={code}
+                  type="button"
+                  onClick={() => onConfigChange({ language: code })}
+                  aria-pressed={active}
+                  className={`rounded px-2 py-0.5 text-[11px] font-[var(--font-mono)] font-semibold tracking-wider uppercase whitespace-nowrap shrink-0 transition-colors cursor-pointer ${
+                    active
+                      ? 'bg-[#c81d25] text-white'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  {code.toUpperCase()}
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -183,11 +206,11 @@ export function HudOverlay({
         <div className="pointer-events-auto flex flex-col items-end gap-1.5">
           <div
             className={`flex items-center divide-x divide-white/10 rounded-lg shadow-lg ${panelBg}`}
-            aria-label="Live Engineering Telemetry"
+            aria-label={copy.telemetry.ariaLabel}
           >
             <div className="px-3.5 py-2">
               <div className="text-[10px] font-medium text-slate-400 whitespace-nowrap">
-                Engine Speed
+                {copy.telemetry.engineSpeed}
               </div>
               <div className="mt-0.5 flex items-baseline gap-1 font-[var(--font-mono)] tabular-nums">
                 <span className="text-base sm:text-lg font-semibold text-white">
@@ -199,7 +222,7 @@ export function HudOverlay({
 
             <div className="px-3.5 py-2">
               <div className="text-[10px] font-medium text-slate-400 whitespace-nowrap">
-                Discharge Flow
+                {copy.telemetry.dischargeFlow}
               </div>
               <div className="mt-0.5 flex items-baseline gap-2 font-[var(--font-mono)] tabular-nums">
                 <span
@@ -217,18 +240,18 @@ export function HudOverlay({
                   </span>
                 </span>
                 <span className="hidden sm:inline text-xs text-slate-300">
-                  {telemetry.flowM3h.toFixed(0)} m³/hr
+                  {telemetry.flowM3h.toFixed(0)} {copy.telemetry.flowUnitM3h}
                 </span>
               </div>
             </div>
 
             <div className="px-3.5 py-2">
               <div className="text-[10px] font-medium text-slate-400 whitespace-nowrap">
-                Engine Load
+                {copy.telemetry.engineLoad}
               </div>
               <div className="mt-0.5 flex items-baseline gap-1 font-[var(--font-mono)] tabular-nums">
                 <span className="text-base sm:text-lg font-semibold text-[#f59e0b]">
-                  {telemetry.loadHp.toFixed(1)}
+                  {formatDecimal(telemetry.loadHp, 1, lang)}
                 </span>
                 <span className="text-[10px] text-slate-400">HP</span>
               </div>
@@ -236,30 +259,32 @@ export function HudOverlay({
 
             <div className="px-3.5 py-2">
               <div className="text-[10px] font-medium text-slate-400 whitespace-nowrap">
-                Fuel Rate
+                {copy.telemetry.fuelRate}
               </div>
               <div className="mt-0.5 flex items-baseline gap-1 font-[var(--font-mono)] tabular-nums">
                 <span className="text-base sm:text-lg font-semibold text-[#34d399]">
-                  {telemetry.fuelLph.toFixed(1)}
+                  {formatDecimal(telemetry.fuelLph, 1, lang)}
                 </span>
-                <span className="text-[10px] text-slate-400">L/hr</span>
+                <span className="text-[10px] text-slate-400">
+                  {copy.telemetry.fuelUnitLph}
+                </span>
               </div>
             </div>
 
             <div className="hidden lg:block px-3.5 py-2">
               <div className="text-[10px] font-medium text-slate-400 whitespace-nowrap">
-                Shaft Torque
+                {copy.telemetry.shaftTorque}
               </div>
               <div className="mt-0.5 flex items-baseline gap-1 font-[var(--font-mono)] tabular-nums">
                 <span className="text-base sm:text-lg font-semibold text-slate-100">
-                  {telemetry.torqueNm.toFixed(1)}
+                  {formatDecimal(telemetry.torqueNm, 1, lang)}
                 </span>
                 <span className="text-[10px] text-slate-400">N·m</span>
               </div>
             </div>
           </div>
 
-          {/* Tanggul Hydraulic Submergence & Cavitation Safety Indicator (Icon + Explicit Text) */}
+          {/* Tanggul Hydraulic Submergence & Cavitation Safety Indicator */}
           {isTanggul && (
             <div
               className={`flex items-center gap-2 rounded-md border px-3 py-1.5 text-[11px] font-medium shadow-md ${cavitationBannerStyle}`}
@@ -278,11 +303,11 @@ export function HudOverlay({
                 />
               )}
               <span className="whitespace-nowrap">
-                {telemetry.cavitationState === 'safe' && 'Submergensi Aman'}
+                {telemetry.cavitationState === 'safe' && copy.cavitation.safe}
                 {telemetry.cavitationState === 'warning' &&
-                  'Peringatan Vortex — Debit Menurun'}
+                  copy.cavitation.warning}
                 {telemetry.cavitationState === 'critical' &&
-                  'Kritis: Masuk Angin / Kering — Turunkan RPM'}
+                  copy.cavitation.critical}
               </span>
               <span aria-hidden="true" className="text-white/30">
                 ·
@@ -291,11 +316,15 @@ export function HudOverlay({
                 {telemetry.submergenceCm >= 0 ? '+' : ''}
                 {Math.round(telemetry.submergenceCm)} cm
               </span>
-              <span aria-hidden="true" className="hidden sm:inline text-white/30">
+              <span
+                aria-hidden="true"
+                className="hidden sm:inline text-white/30"
+              >
                 ·
               </span>
               <span className="hidden sm:inline font-[var(--font-mono)] tabular-nums text-[11px] text-slate-300 whitespace-nowrap">
-                Head {telemetry.staticHeadM.toFixed(2)} m
+                {copy.cavitation.headLabel}{' '}
+                {formatDecimal(telemetry.staticHeadM, 2, lang)} m
               </span>
             </div>
           )}
@@ -346,6 +375,7 @@ export function HudOverlay({
             const index = HOTSPOT_ORDER.indexOf(pt.id) + 1;
             const isSelected = activeHotspot === pt.id;
             const def = HOTSPOTS[pt.id];
+            const pinTitle = pickText(def.title, lang);
             return (
               <button
                 key={pt.id}
@@ -359,13 +389,13 @@ export function HudOverlay({
                     ? 'bg-[#c81d25] border-white/40 text-white z-20'
                     : 'bg-[#0e131b]/90 border-white/20 text-slate-100 hover:border-[#e59a1a] hover:bg-[#161e2b]'
                 }`}
-                aria-label={`Inspect ${def.title}`}
+                aria-label={`${copy.hotspot.inspectPrefix} ${pinTitle}`}
               >
                 <span className="font-[var(--font-mono)] text-[10px] font-semibold text-[#e59a1a] group-hover:text-amber-300">
                   0{index}
                 </span>
                 <span className="whitespace-nowrap text-[11px]">
-                  {def.title.split(' ').slice(0, 3).join(' ')}
+                  {pickText(def.shortLabel, lang)}
                 </span>
               </button>
             );
@@ -379,7 +409,7 @@ export function HudOverlay({
       {selectedHotspotDef && (
         <aside
           className={`pointer-events-auto fixed left-4 sm:left-5 bottom-48 sm:bottom-44 z-20 w-[min(360px,calc(100vw-2rem))] rounded-lg p-4 shadow-2xl ${panelBg}`}
-          aria-label="Component Technical Specification"
+          aria-label={copy.hotspot.panelAria}
         >
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -387,32 +417,34 @@ export function HudOverlay({
                 className="text-lg font-bold tracking-wide text-white leading-tight"
                 style={{ fontFamily: 'var(--font-display)' }}
               >
-                {selectedHotspotDef.title}
+                {pickText(selectedHotspotDef.title, lang)}
               </h2>
               <p className="mt-0.5 text-[11px] text-slate-400">
-                {selectedHotspotDef.subtitle}
+                {pickText(selectedHotspotDef.subtitle, lang)}
               </p>
             </div>
             <button
               type="button"
               onClick={() => onSelectHotspot(null)}
               className="rounded p-1.5 text-slate-400 hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
-              aria-label="Close component specification"
+              aria-label={copy.hotspot.closeAria}
             >
               <X className="h-4 w-4" />
             </button>
           </div>
 
           <p className="mt-2.5 text-xs leading-relaxed text-slate-300">
-            {selectedHotspotDef.description}
+            {pickText(selectedHotspotDef.description, lang)}
           </p>
 
           <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 border-t border-white/10 pt-3">
-            {selectedHotspotDef.specs.map((s) => (
-              <div key={s.label}>
-                <dt className="text-[10px] text-slate-400">{s.label}</dt>
+            {selectedHotspotDef.specs.map((s, idx) => (
+              <div key={idx}>
+                <dt className="text-[10px] text-slate-400">
+                  {pickText(s.label, lang)}
+                </dt>
                 <dd className="text-xs font-medium text-slate-100 font-[var(--font-mono)] tabular-nums">
-                  {s.value}
+                  {pickText(s.value, lang)}
                 </dd>
               </div>
             ))}
@@ -426,7 +458,7 @@ export function HudOverlay({
       {rightDrawer === 'bom' && (
         <aside
           className="pointer-events-auto fixed top-28 right-4 sm:right-5 bottom-48 sm:bottom-44 z-20 flex w-[min(368px,calc(100vw-2rem))] flex-col overflow-hidden rounded-lg border border-white/12 bg-[#0e131b]/95 text-slate-100 shadow-2xl"
-          aria-label="Daftar Part Bill of Materials"
+          aria-label={copy.bom.ariaLabel}
         >
           <div className="flex items-start justify-between gap-3 border-b border-white/10 px-4 py-3">
             <div>
@@ -434,17 +466,17 @@ export function HudOverlay({
                 className="text-base font-bold tracking-wide text-white leading-tight"
                 style={{ fontFamily: 'var(--font-display)' }}
               >
-                DAFTAR PART (BOM)
+                {copy.bom.title}
               </h2>
               <p className="mt-0.5 text-[11px] text-slate-400">
-                Dongfeng ZH1130 + Pompa Aksial 12&quot; · 22 Item
+                {copy.bom.subtitle}
               </p>
             </div>
             <button
               type="button"
               onClick={onCloseDrawer}
               className="rounded p-1 text-slate-400 hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
-              aria-label="Tutup Daftar Part BOM"
+              aria-label={copy.bom.closeAria}
             >
               <X className="h-4 w-4" />
             </button>
@@ -455,11 +487,11 @@ export function HudOverlay({
               <div key={section.code}>
                 <div className="sticky top-0 z-10 flex items-center justify-between bg-[#151c27] px-4 py-1.5 text-[11px] font-semibold tracking-wide text-slate-200 border-b border-white/8">
                   <span>
-                    {section.code}. {section.title}
+                    {section.code}. {pickText(section.title, lang)}
                   </span>
                   {section.sectionQty !== undefined && (
                     <span className="font-[var(--font-mono)] text-[10px] text-slate-400 tabular-nums">
-                      Qty {section.sectionQty}
+                      {copy.bom.qtyLabel} {section.sectionQty}
                     </span>
                   )}
                 </div>
@@ -484,11 +516,11 @@ export function HudOverlay({
                               {item.code}
                             </span>
                             <span className="text-xs font-medium text-slate-100 leading-snug">
-                              {item.name}
+                              {pickText(item.name, lang)}
                             </span>
                           </div>
                           <p className="mt-0.5 text-[10px] leading-snug text-slate-400">
-                            {item.note}
+                            {pickText(item.note, lang)}
                           </p>
                         </div>
                         <span className="font-[var(--font-mono)] text-xs font-semibold text-slate-200 shrink-0 tabular-nums pt-0.5">
@@ -503,7 +535,7 @@ export function HudOverlay({
           </div>
 
           <div className="border-t border-white/10 bg-[#0b1017] px-4 py-2 text-[10px] text-slate-400 flex items-center justify-between">
-            <span>Klik item untuk fokus kamera 3D</span>
+            <span>{copy.bom.footerHint}</span>
             <span className="font-[var(--font-mono)] text-slate-500">
               ESC / B
             </span>
@@ -514,7 +546,7 @@ export function HudOverlay({
       {rightDrawer === 'calculator' && (
         <aside
           className="pointer-events-auto fixed top-28 right-4 sm:right-5 bottom-48 sm:bottom-44 z-20 flex w-[min(372px,calc(100vw-2rem))] flex-col overflow-hidden rounded-lg border border-white/12 bg-[#0e131b]/95 text-slate-100 shadow-2xl"
-          aria-label="Kalkulator Pengurasan Banjir dan Biaya Solar"
+          aria-label={copy.calculator.ariaLabel}
         >
           <div className="flex items-start justify-between gap-3 border-b border-white/10 px-4 py-3">
             <div>
@@ -522,18 +554,19 @@ export function HudOverlay({
                 className="text-base font-bold tracking-wide text-white leading-tight"
                 style={{ fontFamily: 'var(--font-display)' }}
               >
-                KALKULATOR BANJIR &amp; SOLAR
+                {copy.calculator.title}
               </h2>
               <p className="mt-0.5 text-[11px] text-slate-400">
-                Sinkron live dengan RPM ({Math.round(telemetry.engineRpm)}) &amp;
-                debit aktual
+                {copy.calculator.subtitlePrefix} (
+                {Math.round(telemetry.engineRpm)}){' '}
+                {copy.calculator.subtitleSuffix}
               </p>
             </div>
             <button
               type="button"
               onClick={onCloseDrawer}
               className="rounded p-1 text-slate-400 hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
-              aria-label="Tutup Kalkulator Banjir"
+              aria-label={copy.calculator.closeAria}
             >
               <X className="h-4 w-4" />
             </button>
@@ -544,7 +577,7 @@ export function HudOverlay({
             <div className="space-y-1.5">
               <div className="flex items-center justify-between text-xs text-slate-300">
                 <label htmlFor="calc-area" className="font-medium">
-                  Luas Area Genangan
+                  {copy.calculator.areaLabel}
                 </label>
                 <div className="flex items-center rounded border border-white/12 bg-black/40 p-0.5">
                   {(['ha', 'm2'] as const).map((unit) => (
@@ -578,7 +611,9 @@ export function HudOverlay({
                           : 'text-slate-400 hover:text-white'
                       }`}
                     >
-                      {unit === 'ha' ? 'Hektar' : 'm²'}
+                      {unit === 'ha'
+                        ? copy.calculator.unitHa
+                        : copy.calculator.unitM2}
                     </button>
                   ))}
                 </div>
@@ -605,7 +640,7 @@ export function HudOverlay({
                   htmlFor="calc-depth"
                   className="block text-xs font-medium text-slate-300"
                 >
-                  Tinggi Banjir (cm)
+                  {copy.calculator.depthLabel}
                 </label>
                 <input
                   id="calc-depth"
@@ -625,7 +660,7 @@ export function HudOverlay({
 
               <div className="space-y-1.5">
                 <span className="block text-xs font-medium text-slate-300">
-                  Jumlah Pompa
+                  {copy.calculator.pumpUnitsLabel}
                 </span>
                 <div className="grid grid-cols-4 gap-1 rounded-md border border-white/12 bg-black/40 p-1">
                   {[1, 2, 3, 4].map((u) => (
@@ -653,7 +688,7 @@ export function HudOverlay({
                   htmlFor="calc-price"
                   className="font-medium text-slate-300"
                 >
-                  Harga Solar (Rp/Liter)
+                  {copy.calculator.fuelPriceLabel}
                 </label>
                 <div className="flex items-center gap-1">
                   <button
@@ -702,69 +737,67 @@ export function HudOverlay({
             {/* Live Computed Operational Summary */}
             <div className="border-t border-white/12 pt-3 space-y-2.5">
               <div className="flex items-center justify-between text-xs text-slate-400">
-                <span>Volume Air Target</span>
+                <span>{copy.calculator.volumeLabel}</span>
                 <span className="font-[var(--font-mono)] text-sm font-semibold text-white tabular-nums">
-                  {Math.round(floodResult.volumeM3).toLocaleString('id-ID')} m³
+                  {formatInteger(floodResult.volumeM3, lang)} m³
                 </span>
               </div>
               <div className="flex items-center justify-between text-xs text-slate-400">
                 <span>
-                  Debit Gabungan ({floodCalcInput.pumpUnits}× unit)
+                  {copy.calculator.combinedFlowLabel} (
+                  {floodCalcInput.pumpUnits}× {copy.calculator.unitWord})
                 </span>
                 <span className="font-[var(--font-mono)] text-sm font-semibold text-[#38bdf8] tabular-nums">
-                  {Math.round(floodResult.effectiveFlowM3h).toLocaleString(
-                    'id-ID',
-                  )}{' '}
-                  m³/jam
+                  {formatInteger(floodResult.effectiveFlowM3h, lang)}{' '}
+                  {copy.telemetry.flowUnitM3h}
                 </span>
               </div>
 
               {floodResult.hoursRequired === null ? (
                 <div className="rounded-md border border-amber-400/40 bg-amber-950/40 p-3 text-xs text-amber-200 leading-relaxed">
-                  Pompa tidak mengalirkan air (RPM terlalu rendah, Water Flow
-                  nonaktif, atau kanal surut kritis). Naikkan RPM atau elevasi
-                  air kanal untuk melihat estimasi durasi dan solar.
+                  {copy.calculator.noFlowWarning}
                 </div>
               ) : (
                 <dl className="grid grid-cols-2 gap-x-3 gap-y-3 border-t border-white/10 pt-3">
                   <div>
                     <dt className="text-[10px] text-slate-400">
-                      Estimasi Durasi Kuras
+                      {copy.calculator.durationLabel}
                     </dt>
                     <dd className="mt-0.5 text-sm font-bold text-white font-[var(--font-mono)] tabular-nums">
-                      {formatDuration(floodResult.hoursRequired)}
+                      {formatDuration(floodResult.hoursRequired, lang)}
                     </dd>
                   </div>
                   <div>
                     <dt className="text-[10px] text-slate-400">
-                      Total Kebutuhan Solar
+                      {copy.calculator.totalFuelLabel}
                     </dt>
                     <dd className="mt-0.5 text-sm font-bold text-[#34d399] font-[var(--font-mono)] tabular-nums">
-                      {floodResult.totalFuelLiters!.toFixed(1)} L
+                      {formatDecimal(floodResult.totalFuelLiters!, 1, lang)} L
                     </dd>
                   </div>
                   <div>
                     <dt className="text-[10px] text-slate-400">
-                      Estimasi Total Biaya BBM
+                      {copy.calculator.totalCostLabel}
                     </dt>
                     <dd className="mt-0.5 text-sm font-bold text-[#f59e0b] font-[var(--font-mono)] tabular-nums">
-                      {formatRupiah(floodResult.totalFuelCostIdr!)}
+                      {formatCurrency(floodResult.totalFuelCostIdr!, lang)}
                     </dd>
                   </div>
                   <div>
                     <dt className="text-[10px] text-slate-400">
-                      Isi Ulang Tangki (14 L)
+                      {copy.calculator.refillsLabel}
                     </dt>
                     <dd className="mt-0.5 text-sm font-semibold text-slate-200 font-[var(--font-mono)] tabular-nums">
-                      ~{Math.ceil(floodResult.tankRefills14L!)}× isi
+                      ~{Math.ceil(floodResult.tankRefills14L!)}×{' '}
+                      {copy.calculator.refillsSuffix}
                     </dd>
                   </div>
                   <div className="col-span-2 flex items-center justify-between border-t border-white/8 pt-2 text-[11px]">
                     <span className="text-slate-400">
-                      Biaya Pompa per m³ Air
+                      {copy.calculator.costPerM3Label}
                     </span>
                     <span className="font-[var(--font-mono)] font-semibold text-slate-200 tabular-nums">
-                      {formatRupiah(floodResult.costPerM3Idr!)} / m³
+                      {formatCurrency(floodResult.costPerM3Idr!, lang)} / m³
                     </span>
                   </div>
                 </dl>
@@ -773,7 +806,7 @@ export function HudOverlay({
           </div>
 
           <div className="border-t border-white/10 bg-[#0b1017] px-4 py-2 text-[10px] text-slate-400 flex items-center justify-between">
-            <span>Geser Throttle / Muka Air untuk simulasi</span>
+            <span>{copy.calculator.footerHint}</span>
             <span className="font-[var(--font-mono)] text-slate-500">
               ESC / K
             </span>
@@ -795,17 +828,17 @@ export function HudOverlay({
             type="button"
             onClick={onToggleDock}
             className="pointer-events-auto flex items-center gap-1.5 rounded-t-md border border-b-0 border-white/12 bg-[#0e131b]/92 px-3.5 py-1 text-[11px] font-medium text-slate-300 hover:text-white transition-colors cursor-pointer"
-            title="Toggle controls (Press H)"
+            title={copy.dock.toggleTitle}
           >
             {dockCollapsed ? (
               <>
                 <ChevronUp className="h-3.5 w-3.5 text-[#e59a1a]" />
-                <span>Show Controls</span>
+                <span>{copy.dock.showControls}</span>
               </>
             ) : (
               <>
                 <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
-                <span>Hide Controls</span>
+                <span>{copy.dock.hideControls}</span>
               </>
             )}
           </button>
@@ -825,27 +858,28 @@ export function HudOverlay({
             >
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2 text-xs font-medium text-slate-200 whitespace-nowrap">
-                  <span>Throttle</span>
+                  <span>{copy.dock.throttleLabel}</span>
                   <span className="font-[var(--font-mono)] text-xs font-semibold text-white tabular-nums">
                     {config.targetRpm} RPM
                   </span>
                 </div>
 
                 <div className="flex items-center gap-1">
-                  {RPM_STOPS.map((stop) => {
-                    const active = Math.abs(config.targetRpm - stop.value) < 35;
+                  {RPM_VALUES.map((rpmVal) => {
+                    const active = Math.abs(config.targetRpm - rpmVal) < 35;
+                    const label = rpmVal === 0 ? copy.dock.rpmOff : String(rpmVal);
                     return (
                       <button
-                        key={stop.label}
+                        key={rpmVal}
                         type="button"
-                        onClick={() => onConfigChange({ targetRpm: stop.value })}
+                        onClick={() => onConfigChange({ targetRpm: rpmVal })}
                         className={`rounded px-2 py-0.5 text-[11px] font-medium whitespace-nowrap transition-colors cursor-pointer ${
                           active
                             ? 'bg-[#c81d25] text-white'
                             : 'bg-white/6 text-slate-300 hover:bg-white/12 hover:text-white'
                         }`}
                       >
-                        {stop.label}
+                        {label}
                       </button>
                     );
                   })}
@@ -861,7 +895,7 @@ export function HudOverlay({
                 onChange={(e) =>
                   onConfigChange({ targetRpm: Number(e.target.value) })
                 }
-                aria-label="Engine Throttle RPM"
+                aria-label={copy.dock.throttleAria}
                 className="industrial-slider w-full"
               />
             </div>
@@ -872,7 +906,7 @@ export function HudOverlay({
                 <div className="flex items-center justify-between gap-1.5">
                   <div className="flex items-center gap-1.5 text-xs font-medium text-slate-200 whitespace-nowrap">
                     <Waves className="h-3.5 w-3.5 text-[#38bdf8]" />
-                    <span>Air Kanal</span>
+                    <span>{copy.dock.canalLabel}</span>
                     <span className="font-[var(--font-mono)] text-[11px] text-[#7dd3fc] tabular-nums">
                       {telemetry.submergenceCm >= 0 ? '+' : ''}
                       {Math.round(telemetry.submergenceCm)}cm
@@ -885,22 +919,22 @@ export function HudOverlay({
                         Math.abs(config.canalWaterY - lvl.value) < 0.06;
                       return (
                         <button
-                          key={lvl.label}
+                          key={lvl.key}
                           type="button"
                           onClick={() =>
                             onConfigChange({ canalWaterY: lvl.value })
                           }
                           className={`rounded px-1.5 py-0.5 text-[10px] font-medium whitespace-nowrap transition-colors cursor-pointer ${
                             active
-                              ? lvl.label === 'Surut'
+                              ? lvl.key === 'dry'
                                 ? 'bg-red-600 text-white'
-                                : lvl.label === 'Vortex'
+                                : lvl.key === 'vortex'
                                   ? 'bg-amber-600 text-white'
                                   : 'bg-[#0284c7] text-white'
                               : 'bg-white/6 text-slate-300 hover:bg-white/12 hover:text-white'
                           }`}
                         >
-                          {lvl.label}
+                          {copy.dock.canalPresets[lvl.key]}
                         </button>
                       );
                     })}
@@ -918,7 +952,7 @@ export function HudOverlay({
                       canalWaterY: Number(e.target.value) / 100,
                     })
                   }
-                  aria-label="Elevasi Muka Air Kanal"
+                  aria-label={copy.dock.canalAria}
                   className="industrial-slider w-full"
                 />
               </div>
@@ -933,7 +967,7 @@ export function HudOverlay({
               <div className="flex items-center justify-between text-xs font-medium text-slate-200 whitespace-nowrap">
                 <span className="flex items-center gap-1.5">
                   <Layers className="h-3.5 w-3.5 text-[#e59a1a]" />
-                  <span>Exploded</span>
+                  <span>{copy.dock.explodedLabel}</span>
                 </span>
                 <span className="font-[var(--font-mono)] text-xs text-slate-300 tabular-nums">
                   {Math.round(config.explodedAmount * 100)}%
@@ -951,7 +985,7 @@ export function HudOverlay({
                     explodedAmount: Number(e.target.value) / 100,
                   })
                 }
-                aria-label="Exploded View Percentage"
+                aria-label={copy.dock.explodedAria}
                 className="industrial-slider amber-thumb w-full"
               />
             </div>
@@ -974,7 +1008,7 @@ export function HudOverlay({
                 }`}
               >
                 <Eye className="h-3.5 w-3.5" />
-                <span>X-Ray</span>
+                <span>{copy.dock.xray}</span>
               </button>
 
               {/* Water Discharge Flow */}
@@ -990,7 +1024,7 @@ export function HudOverlay({
                 }`}
               >
                 <Droplets className="h-3.5 w-3.5" />
-                <span>Aliran Air</span>
+                <span>{copy.dock.waterFlow}</span>
               </button>
 
               {/* Blue Corrugated Discharge Hose */}
@@ -1006,10 +1040,10 @@ export function HudOverlay({
                     ? 'bg-[#2563eb]/25 border-[#60a5fa]/65 text-blue-200'
                     : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10 hover:text-white'
                 }`}
-                title="Pasang atau lepas Selang Buang spiral biru"
+                title={copy.dock.hoseTitle}
               >
                 <Waves className="h-3.5 w-3.5" />
-                <span>Selang</span>
+                <span>{copy.dock.hose}</span>
               </button>
 
               {/* 3D CAD Engineering Dimensions Overlay */}
@@ -1025,10 +1059,10 @@ export function HudOverlay({
                     ? 'bg-[#e59a1a]/22 border-[#f5b027]/70 text-amber-200'
                     : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10 hover:text-white'
                 }`}
-                title="Tampilkan garis ukuran CAD 3D (Tekan D)"
+                title={copy.dock.cadDimsTitle}
               >
                 <Ruler className="h-3.5 w-3.5" />
-                <span>Dimensi CAD</span>
+                <span>{copy.dock.cadDims}</span>
               </button>
 
               {/* K3 Safety V-Belt Mesh Guard */}
@@ -1044,10 +1078,10 @@ export function HudOverlay({
                     ? 'bg-[#e59a1a]/22 border-[#f5b027]/70 text-amber-200'
                     : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10 hover:text-white'
                 }`}
-                title="Tutup/buka pelindung K3 V-Belt (Tekan G)"
+                title={copy.dock.beltGuardTitle}
               >
                 <Shield className="h-3.5 w-3.5" />
-                <span>Belt Guard</span>
+                <span>{copy.dock.beltGuard}</span>
               </button>
 
               {/* Flood Drainage & Fuel Cost Calculator Drawer */}
@@ -1059,10 +1093,10 @@ export function HudOverlay({
                     ? 'bg-emerald-500/22 border-emerald-400/65 text-emerald-200'
                     : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10 hover:text-white'
                 }`}
-                title="Buka Kalkulator Banjir & Biaya Solar (Tekan K)"
+                title={copy.dock.calculatorTitle}
               >
                 <Calculator className="h-3.5 w-3.5" />
-                <span>Kalkulator</span>
+                <span>{copy.dock.calculator}</span>
               </button>
 
               {/* Interactive BOM Parts List Drawer */}
@@ -1074,10 +1108,10 @@ export function HudOverlay({
                     ? 'bg-[#c81d25]/28 border-[#e59a1a]/70 text-amber-200'
                     : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10 hover:text-white'
                 }`}
-                title="Buka Daftar Part BOM (Tekan B)"
+                title={copy.dock.bomTitle}
               >
                 <ClipboardList className="h-3.5 w-3.5" />
-                <span>Daftar Part</span>
+                <span>{copy.dock.bom}</span>
               </button>
 
               {/* 3D Engineering Callouts */}
@@ -1091,10 +1125,10 @@ export function HudOverlay({
                     ? 'bg-white/14 border-white/30 text-white'
                     : 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10 hover:text-white'
                 }`}
-                title="Tampilkan pin info komponen"
+                title={copy.dock.pinsTitle}
               >
                 <MapPin className="h-3.5 w-3.5" />
-                <span>Pin</span>
+                <span>{copy.dock.pins}</span>
               </button>
 
               {/* Procedural Diesel & Water Audio */}
@@ -1110,8 +1144,8 @@ export function HudOverlay({
                 }`}
                 aria-label={
                   config.audioMuted
-                    ? 'Nyalakan suara mesin diesel dan air'
-                    : 'Matikan suara'
+                    ? copy.dock.audioUnmuteAria
+                    : copy.dock.audioMuteAria
                 }
               >
                 {config.audioMuted ? (
@@ -1120,82 +1154,76 @@ export function HudOverlay({
                   <Volume2 className="h-3.5 w-3.5" />
                 )}
                 <span className="hidden xl:inline">
-                  {config.audioMuted ? 'Mute' : 'Audio'}
+                  {config.audioMuted ? copy.dock.audioMute : copy.dock.audioOn}
                 </span>
               </button>
             </div>
 
             {/* Right Cluster: Stage Mode + Time of Day + Camera View Presets */}
             <div className="flex flex-wrap items-center gap-1.5">
-              {/* Stage Mode: Tanggul | Studio | Field */}
+              {/* Stage Mode: Tanggul | Studio | Lapangan */}
               <div
                 className="flex items-center rounded-md border border-white/10 bg-black/35 p-0.5"
                 role="group"
-                aria-label="Environment Stage Mode"
+                aria-label={copy.dock.stageAria}
               >
-                {(
-                  [
-                    { id: 'tanggul', label: 'Tanggul' },
-                    { id: 'studio', label: 'Studio' },
-                    { id: 'field', label: 'Field' },
-                  ] as Array<{ id: StageMode; label: string }>
-                ).map((st) => {
-                  const active = config.stageMode === st.id;
+                {STAGE_LIST.map((stageId) => {
+                  const active = config.stageMode === stageId;
                   return (
                     <button
-                      key={st.id}
+                      key={stageId}
                       type="button"
-                      onClick={() => onConfigChange({ stageMode: st.id })}
+                      onClick={() => onConfigChange({ stageMode: stageId })}
                       className={`flex items-center gap-1 rounded px-2 py-1 text-xs font-medium whitespace-nowrap shrink-0 transition-colors cursor-pointer ${
                         active
-                          ? st.id === 'tanggul'
+                          ? stageId === 'tanggul'
                             ? 'bg-[#c81d25] text-white'
                             : 'bg-slate-200 text-slate-950'
                           : 'text-slate-400 hover:text-white'
                       }`}
                     >
-                      {st.id === 'tanggul' && (
+                      {stageId === 'tanggul' && (
                         <Mountain className="h-3 w-3" />
                       )}
-                      <span>{st.label}</span>
+                      <span>{copy.dock.stages[stageId]}</span>
                     </button>
                   );
                 })}
               </div>
 
-              {/* Time of Day: Siang | Sore | Malam (Outdoor Lighting + Night Tripod Lamp) */}
+              {/* Time of Day: Siang/Day | Sore/Dusk | Malam/Night */}
               {config.stageMode !== 'studio' && (
                 <div
                   className="flex items-center rounded-md border border-white/10 bg-black/35 p-0.5"
                   role="group"
-                  aria-label="Waktu dan Pencahayaan Lapangan"
+                  aria-label={copy.dock.timeAria}
                 >
-                  {TIME_OPTIONS.map((t) => {
-                    const active = config.timeOfDay === t.id;
+                  {TIME_LIST.map((timeId) => {
+                    const active = config.timeOfDay === timeId;
                     return (
                       <button
-                        key={t.id}
+                        key={timeId}
                         type="button"
-                        onClick={() => onConfigChange({ timeOfDay: t.id })}
+                        onClick={() => onConfigChange({ timeOfDay: timeId })}
                         className={`flex items-center gap-1 rounded px-2 py-1 text-xs font-medium whitespace-nowrap shrink-0 transition-colors cursor-pointer ${
                           active
-                            ? t.id === 'night'
+                            ? timeId === 'night'
                               ? 'bg-[#1d4ed8] text-white'
-                              : t.id === 'dusk'
+                              : timeId === 'dusk'
                                 ? 'bg-[#d97706] text-white'
                                 : 'bg-slate-200 text-slate-950'
                             : 'text-slate-400 hover:text-white'
                         }`}
                         title={
-                          t.id === 'night'
-                            ? 'Mode Malam dengan Menara Lampu Sorot LED'
+                          timeId === 'night'
+                            ? copy.dock.nightLampTitle
                             : undefined
                         }
                       >
-                        {t.id === 'day' && <Sun className="h-3 w-3" />}
-                        {t.id === 'dusk' && <Sunset className="h-3 w-3" />}
-                        {t.id === 'night' && <Moon className="h-3 w-3" />}
-                        <span>{t.label}</span>
+                        {timeId === 'day' && <Sun className="h-3 w-3" />}
+                        {timeId === 'dusk' && <Sunset className="h-3 w-3" />}
+                        {timeId === 'night' && <Moon className="h-3 w-3" />}
+                        <span>{copy.dock.times[timeId]}</span>
                       </button>
                     );
                   })}
@@ -1219,7 +1247,7 @@ export function HudOverlay({
                           : 'bg-white/4 text-slate-300 hover:bg-white/10 hover:text-white'
                       }`}
                     >
-                      {preset.label}
+                      {pickText(preset.label, lang)}
                     </button>
                   );
                 })}
@@ -1231,12 +1259,9 @@ export function HudOverlay({
           <div className="mt-2 hidden sm:flex items-center justify-between text-[10px] text-slate-500">
             <span className="flex items-center gap-1.5">
               <Info className="h-3 w-3" />
-              <span>Drag orbit · Scroll zoom · Right-drag pan</span>
+              <span>{copy.dock.orbitHint}</span>
             </span>
-            <span>
-              H Kontrol · X X-Ray · D Dimensi CAD · G Belt Guard · K Kalkulator
-              · B BOM
-            </span>
+            <span>{copy.dock.shortcutHint}</span>
           </div>
         </div>
       </div>
